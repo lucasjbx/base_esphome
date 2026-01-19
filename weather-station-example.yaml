@@ -1,0 +1,194 @@
+# Example: ESPHome Base Template with BME280 Sensor
+# This shows how to extend the base template with specific sensors
+
+substitutions:
+  device_name: "weather-station"
+  device_description: "Weather Station with BME280"
+  project_name: "Weather Station"
+  project_version: "1.0.0"
+
+  # Hardware pins
+  i2c_sda_pin: GPIO21
+  i2c_scl_pin: GPIO22
+  button_pin: GPIO4
+  display_address: 0x3C
+  sensor_address: 0x76
+
+  # Update intervals
+  sensor_update_interval: 30s  # Weather data doesn't need to be super frequent
+  display_update_interval: 10s
+
+esphome:
+  name: "${device_name}"
+  friendly_name: "${device_description}"
+  name_add_mac_suffix: true
+  comment: "${device_description}"
+  min_version: 2024.6.0
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+
+ota:
+  - platform: esphome
+
+web_server:
+  port: 80
+
+mdns:
+  disabled: false
+
+wifi:
+  ap:
+    ssid: "${device_name}"
+    password: "esphome123"
+
+captive_portal:
+
+esp32_improv:
+  authorizer: none
+
+i2c:
+  sda: ${i2c_sda_pin}
+  scl: ${i2c_scl_pin}
+  scan: true
+
+# Enable display for weather data
+display:
+  - platform: ssd1306_i2c
+    id: oled_display
+    model: "SSD1306 128x64"
+    address: ${display_address}
+    update_interval: ${display_update_interval}
+    lambda: |-
+      it.clear();
+
+      if (wifi::global_wifi_component->is_connected()) {
+        it.printf(0, 0, id(font_small), "Weather Station");
+
+        if (id(temperature_sensor).has_state()) {
+          it.printf(0, 16, id(font_medium), "Temp: %.1f C", id(temperature_sensor).state);
+        } else {
+          it.printf(0, 16, id(font_medium), "Temp: -- C");
+        }
+
+        if (id(humidity_sensor).has_state()) {
+          it.printf(0, 32, id(font_medium), "Hum: %.1f %%", id(humidity_sensor).state);
+        } else {
+          it.printf(0, 32, id(font_medium), "Hum: -- %%");
+        }
+
+        if (id(pressure_sensor).has_state()) {
+          it.printf(0, 48, id(font_medium), "Pres: %.0f hPa", id(pressure_sensor).state);
+        } else {
+          it.printf(0, 48, id(font_medium), "Pres: -- hPa");
+        }
+      } else {
+        it.printf(0, 0, id(font_small), "WiFi: NO");
+        it.printf(0, 16, id(font_small), "Connect to WiFi:");
+        it.printf(0, 32, id(font_small), "${device_name}");
+        it.printf(0, 48, id(font_small), "PW: esphome123");
+      }
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 12
+  - file: "gfonts://Roboto"
+    id: font_medium
+    size: 16
+
+# BME280 Environmental Sensor
+sensor:
+  - platform: bme280_i2c
+    id: bme280_sensor
+    update_interval: ${sensor_update_interval}
+    temperature:
+      id: temperature_sensor
+      name: Temperature
+      filters:
+        - offset: 0.0  # Calibrate if needed
+    humidity:
+      id: humidity_sensor
+      name: Humidity
+    pressure:
+      id: pressure_sensor
+      name: Atmospheric Pressure
+    address: ${sensor_address}
+
+  # WiFi and system sensors
+  - platform: wifi_signal
+    name: WiFi Signal
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: Uptime
+    update_interval: 60s
+    entity_category: diagnostic
+
+  # Additional weather calculations
+  - platform: template
+    name: "Dew Point"
+    unit_of_measurement: "°C"
+    lambda: |-
+      if (id(temperature_sensor).has_state() && id(humidity_sensor).has_state()) {
+        // Magnus formula for dew point
+        float t = id(temperature_sensor).state;
+        float h = id(humidity_sensor).state / 100.0;
+        float a = 17.27;
+        float b = 237.7;
+        float alpha = ((a * t) / (b + t)) + log(h);
+        return (b * alpha) / (a - alpha);
+      }
+      return NAN;
+    update_interval: ${sensor_update_interval}
+
+  - platform: template
+    name: "Heat Index"
+    unit_of_measurement: "°C"
+    lambda: |-
+      if (id(temperature_sensor).has_state() && id(humidity_sensor).has_state()) {
+        // Simplified heat index calculation
+        float t = id(temperature_sensor).state;
+        float h = id(humidity_sensor).state;
+        if (t >= 27) {
+          return -8.784695 + 1.61139411 * t + 2.338549 * h - 0.14611605 * t * h
+               - 0.012308094 * t * t - 0.016424828 * h * h + 0.002211732 * t * t * h
+               + 0.00072546 * t * h * h - 0.000003582 * t * t * h * h;
+        }
+      }
+      return NAN;
+    update_interval: ${sensor_update_interval}
+
+# Binary sensors
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: ${button_pin}
+      mode: INPUT_PULLUP
+      inverted: true
+    id: action_button
+    name: "Action Button"
+    on_press:
+      then:
+        - lambda: |-
+            // Weather station button actions
+            ESP_LOGI("weather", "Button pressed - refreshing display");
+
+  - platform: status
+    name: Device Status
+    entity_category: diagnostic
+
+# Factory reset button
+button:
+  - platform: factory_reset
+    id: factory_reset_button
+    name: Factory Reset
+

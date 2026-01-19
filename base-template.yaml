@@ -1,0 +1,166 @@
+# ESPHome Base Template
+# A comprehensive starting point for ESP32 IoT projects
+# Includes WiFi setup, factory reset, OTA updates, and API integration
+
+substitutions:
+  # Device identification
+  device_name: "esphome-device"
+  device_description: "ESPHome IoT Device"
+  project_name: "Base ESPHome Template"
+  project_version: "1.0.0"
+
+  # Hardware configuration
+  i2c_sda_pin: GPIO21
+  i2c_scl_pin: GPIO22
+  button_pin: GPIO4
+
+  # Display settings (optional)
+  display_update_interval: 5s
+
+  # Sensor settings
+  sensor_update_interval: 10s
+
+esphome:
+  name: "${device_name}"
+  friendly_name: "${device_description}"
+  name_add_mac_suffix: true  # Makes device name unique
+  comment: "${device_description}"
+  min_version: 2024.6.0
+
+esp32:
+  board: esp32dev  # Change this for different ESP32 variants
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+  level: INFO
+
+# API for Home Assistant integration
+api:
+
+# Enable OTA updates
+ota:
+  - platform: esphome
+
+# Web server for device status
+web_server:
+  port: 80
+
+# mDNS for better network discovery
+mdns:
+  disabled: false
+
+# WiFi configuration with AP fallback
+wifi:
+  ap:
+    ssid: "${device_name}"
+    password: "esphome123"
+
+captive_portal:
+
+# ESP32 Improv for mobile app configuration
+esp32_improv:
+  authorizer: none
+
+# I2C bus for sensors and displays
+i2c:
+  sda: ${i2c_sda_pin}
+  scl: ${i2c_scl_pin}
+  scan: true
+
+# Optional: SSD1306 OLED Display
+# Uncomment and configure if you have a display
+# display:
+#   - platform: ssd1306_i2c
+#     id: oled_display
+#     model: "SSD1306 128x64"
+#     address: 0x3C
+#     update_interval: ${display_update_interval}
+#     lambda: |-
+#       it.clear();
+#       it.printf(0, 0, id(font_small), "${device_description}");
+#       it.printf(0, 16, id(font_small), "IP: %s", wifi::global_wifi_component->wifi_sta_ip().str().c_str());
+#       it.printf(0, 32, id(font_small), "WiFi: %s", wifi::global_wifi_component->is_connected() ? "OK" : "NO");
+
+# font:
+#   - file: "gfonts://Roboto"
+#     id: font_small
+#     size: 12
+
+# Example sensor: BME280
+# Uncomment and modify for your sensor
+# sensor:
+#   - platform: bme280_i2c
+#     id: bme280_sensor
+#     update_interval: ${sensor_update_interval}
+#     temperature:
+#       id: temperature_sensor
+#       name: Temperature
+#     humidity:
+#       id: humidity_sensor
+#       name: Humidity
+#     pressure:
+#       id: pressure_sensor
+#       name: Pressure
+#     address: 0x76
+
+# Binary sensors
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: ${button_pin}
+      mode: INPUT_PULLUP
+      inverted: true
+    id: action_button
+    name: "Action Button"
+    on_press:
+      then:
+        - lambda: |-
+            // Add custom button actions here
+            ESP_LOGI("button", "Button pressed");
+
+  - platform: status
+    name: "Device Status"
+    entity_category: diagnostic
+
+# Buttons
+button:
+  - platform: factory_reset
+    id: factory_reset_button
+    name: "Factory Reset"
+
+# Basic sensors
+sensor:
+  - platform: wifi_signal
+    name: WiFi Signal
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: Uptime
+    update_interval: 60s
+    entity_category: diagnostic
+
+# Example switch (uncomment if needed)
+# switch:
+#   - platform: gpio
+#     pin: GPIO5
+#     name: "Relay"
+#     id: relay
+
+# Example light (uncomment if needed)
+# light:
+#   - platform: status_led
+#     name: "Status LED"
+#     pin:
+#       inverted: true
+#       number: GPIO2
+
+# Additional sensors can be added here
+# Examples:
+# - DHT22 temperature/humidity sensor
+# - DS18B20 temperature sensor
+# - MQ-135 air quality sensor
+# - PIR motion sensor
+# - Ultrasonic distance sensor
