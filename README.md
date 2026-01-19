@@ -259,7 +259,7 @@ This project is open source. Feel free to use, modify, and distribute.
 
 ## 🙏 Acknowledgments
 
-This ESPHome base template was developed with the assistance of an AI language model (Claude by Anthropic). The template incorporates best practices from the ESPHome community and provides a solid foundation for IoT projects.
+This ESPHome base template was developed with the assistance of an AI language model. The template incorporates best practices from the ESPHome community and provides a solid foundation for IoT projects.
 
 ## 📞 Support
 
